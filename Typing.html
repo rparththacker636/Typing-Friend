@@ -1,180 +1,791 @@
-import speech_recognition as sr
-import pyttsx3
-import subprocess
-import os
-import time
-import datetime
-import re
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Typing Speed Tester</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
 
-class Jarvis:
-    def __init__(self):
-        self.recognizer = sr.Recognizer()
-        self.microphone = sr.Microphone()
-        self.engine = pyttsx3.init()
-        self.engine.setProperty('rate', 175)
-        self.user = os.getlogin()
+  <!-- Google Fonts for modern appearance -->
+  <link rel="preconnect" href="https://fonts.gstatic.com">
+  <link href="https://fonts.googleapis.com/css?family=Montserrat:700,400&display=swap" rel="stylesheet">
 
-    def speak(self, text):
-        print(f"Jarvis: {text}")
-        self.engine.say(text)
-        self.engine.runAndWait()
+  <style>
+    :root {
+      --accent1: #65f5a3;
+      --accent1-dark: #1bead1;
+      --accent2: #3E8DDA;
+      --danger: #ff5d74;
+      --bg1: #181c2a;
+      --bg2: #232b34;
+      --text-main: #f8fefd;
+      --text-muted: #b5dbe3;
+      --border-glow: 0 0 42px 5px #65f5a365;
+      --glass-bg: rgba(25,29,45,0.89);
+      --shadow-hero: 0 12px 40px #1bead14d, 0 2.5px 18px #171c2570;
+    }
+    html, body {
+      height: 100%;
+      padding: 0;
+      margin: 0;
+    }
+    body {
+      min-height: 100vh;
+      background:
+        linear-gradient(109deg, #19234b 7%, #131b22 100%) fixed,
+        radial-gradient(ellipse at 65vw 10vh, #3337a1 18%, transparent 80%);
+      color: var(--text-main);
+      font-family: 'Montserrat', Arial, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      letter-spacing: 0.01em;
+      margin: 0;
+      /* Subtle classy noise */
+      background-blend-mode: overlay;
+      position: relative;
+      z-index: 1;
+    }
+    /* Glassy blur hero effect container */
+    .typing-container {
+      background: var(--glass-bg);
+      padding: 2.9rem 2.55rem 2.6rem 2.55rem;
+      border-radius: 1.65rem;
+      box-shadow: var(--shadow-hero);
+      max-width: 510px;
+      width: 96vw;
+      margin: 3vw auto;
+      text-align: center;
+      position: relative;
+      border: 2px solid #28e7c99a;
+      z-index: 2;
+      backdrop-filter: blur(7px) saturate(160%);
+      -webkit-backdrop-filter: blur(7px) saturate(160%);
+      transition: box-shadow 0.2s, border-color 0.23s;
+    }
+    .typing-container::after {
+      /* Diagonal shine for depth/class */
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      pointer-events: none;
+      border-radius: 1.6rem;
+      background: linear-gradient(110deg,rgba(255,255,255,0.07) 0%,rgba(255,255,255,0.00) 100%);
+      z-index: 2;
+      box-shadow: 0 1.5px 40px 1px #43ffd2d0 inset;
+      opacity: .26;
+    }
 
-    def listen(self, prompt=""):
-        if prompt:
-            self.speak(prompt)
-        with self.microphone as source:
-            self.recognizer.adjust_for_ambient_noise(source)
-            try:
-                audio = self.recognizer.listen(source, timeout=6, phrase_time_limit=8)
-            except sr.WaitTimeoutError:
-                self.speak("Listening timed out. Please try again.")
-                return ""
-        try:
-            command = self.recognizer.recognize_google(audio)
-            print(f"You: {command}")
-            return command.lower()
-        except sr.UnknownValueError:
-            self.speak("Sorry, I did not understand.")
-            return ""
-        except sr.RequestError:
-            self.speak("Network error. Could not process your command.")
-            return ""
+    .test-title {
+      font-size: 2.22rem;
+      font-weight: 900;
+      margin-bottom: 1.18rem;
+      letter-spacing: 0.02em;
+      background: linear-gradient(97deg,var(--accent1) 70%,var(--accent2) 106%);
+      background-clip: text;
+      -webkit-background-clip: text;
+      color: transparent;
+      -webkit-text-fill-color: transparent;
+      filter: drop-shadow(0 4px 19px #65f5a370);
+      text-shadow: 0 2.4px 9px #2cf2d143;
+      user-select: none;
+    }
+    .info-bar {
+      display: flex;
+      justify-content: space-between;
+      gap: 1.1rem;
+      margin-bottom: .82rem;
+      margin-top: .27rem;
+    }
+    .timer-label, .wpm-mini-label, .level-label, .score-label {
+      background: linear-gradient(90deg,#151c26,#19303e 95%);
+      color: #bafde5;
+      border-radius: 8.5px;
+      font-size: 1.11em;
+      font-weight: 650;
+      padding: 0.29em 1.01em 0.21em 1.01em;
+      letter-spacing: 0.01em;
+      margin: 0;
+      min-width: 68px;
+      box-shadow: 0 1.3px 8px #3eddb335;
+      border: 1.4px solid #2cf2d14d;
+      text-shadow: 0 1.4px 8px #35fad413;
+      transition: color 0.16s, border .14s;
+    }
+    .level-label {
+      color: #7afdce;
+      border-color: #74e1b0;
+      min-width: 57px;
+    }
+    .score-label {
+      color: #ffe891;
+      border-color: #f7ecb7;
+      min-width: 90px;
+    }
+    .wpm-mini-label {
+      color: #bde2fd;
+      border-color: #74caff44;
+    }
+    .timer-label {
+      color: #eafefa;
+      border-color: #aefcdb84;
+      transition: color 0.19s;
+    }
 
-    def extract_app_name(self, command):
-        possible = re.findall(r'open (?:the )?(.*?)(?: app| application)?$', command)
-        app = possible[0] if possible else command.replace('open ', '').strip()
-        # Some normalization for common app names
-        app_aliases = {
-            'finder': 'Finder',
-            'terminal': 'Terminal',
-            'safari': 'Safari',
-            'chrome': 'Google Chrome',
-            'notes': 'Notes',
-            'mail': 'Mail',
-            'music': 'Music',
-            'messages': 'Messages',
-            'calendar': 'Calendar'
+    .instructions {
+      font-size: 1.11em;
+      color: var(--text-muted);
+      background: linear-gradient(94deg,#232e36 24%,#202c3a 94%);
+      padding: 0.92em 1.23em;
+      border-radius: 13px;
+      margin-bottom: 1.41rem;
+      margin-top: 0.07rem;
+      line-height: 1.7em;
+      border-left: 4px solid var(--accent1);
+      text-align: left;
+      display: block;
+      box-shadow: 0 2px 10px #2edadb16;
+      transition: border .13s;
+      font-weight: 500;
+      letter-spacing: 0.012em;
+    }
+
+    .sentence-box {
+      background: linear-gradient(112deg,#284167 18%, #22212d 110%);
+      padding: 1.26rem 1.28rem;
+      font-size: 1.21rem;
+      border-radius: 15px;
+      color: #ecfeff;
+      margin-bottom: 1.2rem;
+      min-height: 56px;
+      outline: none;
+      border: 1.7px solid #2afbdd62;
+      text-align: left;
+      line-height: 1.65em;
+      word-break: break-word;
+      user-select: none;
+      font-family: 'Montserrat', Arial, sans-serif;
+      box-shadow: 0 8px 32px #82efe72c;
+      letter-spacing: 0.012em;
+      transition: box-shadow 0.25s, border 0.22s;
+      position: relative;
+      z-index: 5;
+    }
+    .sentence-box:after {
+      content: '';
+      display: block;
+      border-radius: 7px;
+      box-shadow: 0 0 16px 4px #3cfefc14;
+      margin-top: 2px;
+    }
+    .sentence-box:focus {
+      border: 1.82px solid var(--accent1);
+      box-shadow: var(--border-glow);
+    }
+
+    .input-wrap {
+      position: relative;
+      width: 100%;
+      margin-bottom: 1.18em;
+    }
+    .input-box {
+      width: 100%;
+      padding: 0.92em 1.18em;
+      border-radius: 9px;
+      border: 1.7px solid #2cf2d130;
+      font-size: 1.19rem;
+      background: linear-gradient(93deg, #161e2b 51%, #11271c 120%);
+      color: #cafefb;
+      outline: none;
+      transition: border-color 0.18s, box-shadow 0.15s, background 0.19s;
+      box-shadow: 0 3.2px 22px #24feae25;
+      letter-spacing: .012em;
+      font-family: inherit;
+      margin-bottom: 0;
+      z-index: 1;
+      caret-color: var(--accent1-dark);
+    }
+    .input-box:focus {
+      border-color: var(--accent1);
+      box-shadow: 0 0 0 2px #35fad439, 0 2px 12px #25eec666;
+      background: linear-gradient(94deg, #232e42 90%, #12362c 162%);
+    }
+    .input-box:disabled {
+      opacity: 0.65;
+      background: #212c39 !important;
+      color: #6fa7aa;
+      filter: saturate(77%);
+    }
+    .input-box.input-ok {
+      background: linear-gradient(93deg, #181f29 47%, #102e1f 110%);
+      border-color: #19f8c7;
+      box-shadow: 0 0 10px #2cf2d12e inset;
+      transition: background 0.22s, border .12s;
+    }
+    .input-box.input-wrong {
+      background: linear-gradient(97deg,#322731ad 74%,#f57a8b27 100%);
+      border-color: var(--danger);
+      animation: flashWrong 0.34s;
+    }
+    @keyframes flashWrong {
+      0%   {box-shadow: 0 0 0 0 #ff5d7423;}
+      60%  {box-shadow: 0 0 0 10px #ff5d7425;}
+      100% {box-shadow: 0 0 0 0 #ff5d7400;}
+    }
+
+    /* Button Row */
+    .btn-row {
+      display: flex;
+      justify-content: center;
+      gap: 1.35rem;
+      margin-bottom: 1.26rem;
+      margin-top: 0.09rem;
+    }
+    .base-btn {
+      padding: 0.58em 1.69em;
+      font-size: 1.16rem;
+      border-radius: 9px;
+      border: none;
+      background: linear-gradient(92deg,var(--accent1) 80%,var(--accent2) 125%);
+      color: #174c3e;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+      cursor: pointer;
+      transition: 
+        background 0.19s,
+        color 0.14s,
+        box-shadow .22s,
+        transform 0.11s,
+        filter 0.18s;
+      box-shadow: 0 3px 13px #3ff7b919,0 1.8px 3.6px #3eddb32a;
+      outline: none;
+      margin-bottom: 0;
+      min-width: 90px;
+      border-bottom: 2.2px solid #19eac385;
+      filter: drop-shadow(0 7px 13px #20eeb011);
+    }
+    .base-btn:active { transform: scale(0.96);}
+    .base-btn:focus { box-shadow: 0 5px 12px #2cf2d130;}
+    .base-btn:disabled {
+      opacity: 0.53;
+      cursor: not-allowed;
+      box-shadow: none;
+      filter: grayscale(32%) blur(.5px);
+    }
+    .start-btn {}
+    .stop-btn {
+      background: linear-gradient(93deg,#4e91ff 93%,#f36797 135%);
+      color: #fff;
+      border-bottom: 2.2px solid #b762eb93;
+    }
+    .restart-btn {
+      background: linear-gradient(92deg,#55fcb9 90%,#37c78e 140%);
+      color: #094828;
+      border-bottom: 2.2px solid #1ad89c;
+    }
+    .restart-btn.glow-restart {
+      box-shadow: 0 0 30px #25e3fff5,0 4px 24px #38e1daf0, 0 1px 2px #222;
+      animation: glowPulse 1.3s infinite alternate;
+    }
+    @keyframes glowPulse {
+      from { box-shadow:0 0 18px #25e3ff75,0 1px 15px #25eeb035,0 1px 2px #222;}
+      to { box-shadow:0 0 44px #17ffc391,0 7px 34px #38e1dac5,0 1px 2px #222;}
+    }
+    .wpm-result {
+      font-size: 1.35em;
+      font-family: inherit;
+      font-weight: 700;
+      background: linear-gradient(96deg, #252e29 44%, #162f34 110%);
+      min-height: 2.7em;
+      min-width: 150px;
+      padding: 1.13em 1.06em 0.93em 1.06em;
+      border-radius: 15px;
+      margin: 1.48rem auto 0.8rem auto;
+      color: #51f58e;
+      letter-spacing: 0.02em;
+      box-shadow: 0 2.1px 18px #65f5a429;
+      border: 1.6px solid #20d38a2c;
+      display: inline-block;
+      backdrop-filter: blur(2.6px);
+      -webkit-backdrop-filter: blur(2.6px);
+      transition: box-shadow .22s, border .17s;
+      z-index: 10;
+      position: relative;
+    }
+    .wpm-result .main-wpm {
+      font-size: 1.52em;
+      color: #65f5a3;
+      filter: drop-shadow(0 0px 8px #52f5a059);
+    }
+    .wpm-result .incomplete {
+      color: #e8e07d;
+      background: none;
+      font-weight: 600;
+    }
+    .wpm-result .wrong {
+      color: #f67a82;
+      font-weight: 600;
+    }
+
+    /* Progress bar */
+    .progress-wrap {
+      margin-top: 0.16em;
+      margin-bottom: 1.13em;
+      width: 100%;
+    }
+    .progress-bar-bg {
+      width: 100%;
+      height: 9px;
+      border-radius: 6px;
+      background: linear-gradient(90deg, #142d23 35%, #191925 97%);
+      margin: 0.2em 0 0.21em 0;
+      overflow: hidden;
+      box-shadow: 0 1.5px 9px #42f6c125;
+    }
+    .progress-bar-fill {
+      height: 100%;
+      border-radius: 6px;
+      background: linear-gradient(90deg, var(--accent1) 75%, var(--accent2) 100%);
+      width: 0%;
+      transition: width 0.18s cubic-bezier(.44,0,.1,1),background 0.18s;
+    }
+
+    /* Animations & responsive */
+    @media (max-width: 659px) {
+      .typing-container {
+        padding: 1.37rem 2vw 1.17rem 2vw;
+        border-radius: 1.18rem;
+      }
+      .sentence-box, .wpm-result { font-size: 1.06em;}
+      .instructions { font-size: 1em; margin-bottom:1.04rem;}
+      .test-title { font-size: 1.22rem; margin-bottom: 0.67em;}
+      .btn-row { gap: 0.82rem; }
+      .input-box {font-size:1.01em;}
+    }
+    @media (max-width:410px) {
+      .sentence-box { font-size: 0.92em;}
+      .test-title {font-size:1.07rem;}
+    }
+  </style>
+</head>
+<body>
+  <div class="typing-container">
+    <div class="test-title">
+      <span style="text-shadow:0 2px 16px #15efd099;">Typing Speed Tester</span>
+    </div>
+    <div class="instructions">
+      <b>How to play:</b> Click <kbd>Start</kbd> and type the highlighted sentence as accurately and quickly as you can.
+      <br>
+      Points are awarded for each correct level. Difficulty increases after each correct sentence.<br>
+      If you make a mistake, you will restart from level 1. Try to score as high as you can!
+    </div>
+    <div class="info-bar">
+      <span class="level-label" id="levelLabel">Level: 1</span>
+      <span class="score-label" id="scoreLabel">Score: 0</span>
+      <span class="timer-label" id="timerLabel">Time: 0.0s</span>
+      <span class="wpm-mini-label" id="liveWpmLabel" title="Live Words Per Minute (WPM)">WPM: 0</span>
+    </div>
+    <div class="sentence-box" id="sentenceBox"></div>
+    <div class="progress-wrap">
+      <div class="progress-bar-bg">
+        <div class="progress-bar-fill" id="progressBar"></div>
+      </div>
+    </div>
+    <div class="input-wrap">
+      <input type="text" class="input-box" id="typingInput" placeholder="Start typing here..." disabled autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
+    </div>
+    <div class="btn-row">
+      <button class="base-btn start-btn" id="startBtn">Start</button>
+      <button class="base-btn stop-btn" id="stopBtn" style="display:none;">Stop</button>
+      <button class="base-btn restart-btn" id="restartBtn" style="display:none;">Restart</button>
+    </div>
+    <div class="wpm-result" id="wpmResult"></div>
+  </div>
+  <script>
+    // Sentences grouped by increasing "difficulty" (simple > complex)
+    const levels = [
+      [
+        "Pack my box with five dozen liquor jugs.",
+        "The quick brown fox jumps over the lazy dog.",
+        "How vexingly quick daft zebras jump!",
+        "Quick zephyrs blow, vexing daft Jim.",
+        "Jackdaws love my big sphinx of quartz."
+      ],
+      [
+        "A wizard’s job is to vex chumps quickly in fog.",
+        "Bright vixens jump; dozy fowl quack.",
+        "Jinxed wizards pluck ivy from the big quilt.",
+        "Sphinx of black quartz, judge my vow.",
+        "Five hexing wizard bots jump quickly."
+      ],
+      [
+        "Glib jocks quiz nymph to vex dwarf.",
+        "Vexed nymphs go for quick waltz job.",
+        "The quick onyx goblin jumps over the lazy dwarf.",
+        "Amazingly few discotheques provide jukeboxes.",
+        "Grumpy wizards make toxic brew for the evil queen and jack."
+      ],
+      [
+        "Just keep examining every low bid quoted for zinc etchings.",
+        "The five boxing wizards jump quickly.",
+        "The job requires extra pluck and zeal from every young wage earner.",
+        "Watch Jeopardy!, Alex Trebek’s fun TV quiz game.",
+        "By Jove, my quick study of lexicography won a prize!"
+      ]
+      // Add more/longer sentences for even higher levels if desired
+    ];
+    let maxLevel = levels.length;
+
+    // Game state
+    let currentSentence = "";
+    let currentLevel = 1; // 1-based
+    let startTime = null, endTime = null;
+    let testRunning = false;
+    let stoppedEarly = false;
+    let score = 0;
+
+    // DOM elements
+    const sentenceBox = document.getElementById("sentenceBox");
+    const typingInput = document.getElementById("typingInput");
+    const wpmResult = document.getElementById("wpmResult");
+    const startBtn = document.getElementById("startBtn");
+    const stopBtn = document.getElementById("stopBtn");
+    const restartBtn = document.getElementById("restartBtn");
+    const timerLabel = document.getElementById("timerLabel");
+    const progressBar = document.getElementById("progressBar");
+    const liveWpmLabel = document.getElementById("liveWpmLabel");
+    const levelLabel = document.getElementById("levelLabel");
+    const scoreLabel = document.getElementById("scoreLabel");
+    let timerInterval = null;
+
+    function wordCount(str) {
+      return str.trim().length ? str.trim().split(/\s+/).length : 0;
+    }
+
+    function pickSentenceForLevel(level) {
+      // level: 1-based index, but levels[] is 0-based
+      const sentencesArr = levels[(level - 1) % levels.length];
+      return sentencesArr[Math.floor(Math.random() * sentencesArr.length)];
+    }
+
+    function updateScoreAndLevelDisplay() {
+      levelLabel.textContent = "Level: " + currentLevel;
+      scoreLabel.textContent = "Score: " + score;
+    }
+
+    function resetTest() {
+      currentLevel = 1;
+      score = 0;
+      loadSentence();
+      typingInput.value = "";
+      typingInput.disabled = true;
+      typingInput.className = "input-box";
+      wpmResult.innerHTML = "&nbsp;";
+      timerLabel.textContent = "Time: 0.0s";
+      timerLabel.style.color = "#eafefa";
+      liveWpmLabel.textContent = "WPM: 0";
+      liveWpmLabel.style.color = "#bde2fd";
+      startBtn.disabled = false;
+      restartBtn.style.display = "none";
+      stopBtn.style.display = "none";
+      startBtn.style.display = "inline-block";
+      stoppedEarly = false;
+      testRunning = false;
+      endTime = null;
+      clearInterval(timerInterval);
+      progressBar.style.width = "0%";
+      progressBar.style.background =
+        "linear-gradient(90deg, var(--accent1) 55%, var(--accent2) 100%)";
+      updateScoreAndLevelDisplay();
+      // Reset timer value to 0
+      startTime = null;
+      updateTimer(0);
+    }
+
+    function loadSentence() {
+      currentSentence = pickSentenceForLevel(currentLevel);
+      sentenceBox.textContent = currentSentence;
+    }
+
+    function startTest() {
+      testRunning = true;
+      stoppedEarly = false;
+      typingInput.value = "";
+      typingInput.disabled = false;
+      typingInput.focus();
+      typingInput.className = "input-box input-ok";
+      wpmResult.innerHTML = "&nbsp;";
+      startBtn.disabled = true;
+      timerLabel.textContent = "Time: 0.0s";
+      timerLabel.style.color = "#eafefa";
+      liveWpmLabel.textContent = "WPM: 0";
+      liveWpmLabel.style.color = "#bde2fd";
+      restartBtn.style.display = "none";
+      stopBtn.style.display = "inline-block";
+      startBtn.style.display = "none";
+      progressBar.style.width = "0%";
+      progressBar.style.background =
+        "linear-gradient(90deg, var(--accent1) 55%, var(--accent2) 100%)";
+      updateScoreAndLevelDisplay();
+      // Set timer to 0 and start
+      startTime = new Date();
+      endTime = null;
+      updateTimer(0);
+      timerInterval = setInterval(() => {
+        updateTimer();
+        updateLiveWpm();
+        updateProgressBar();
+      }, 80);
+    }
+
+    function processInput() {
+      if (!testRunning) return;
+
+      // Highlight correct/incorrect input
+      if (currentSentence.startsWith(typingInput.value)) {
+        typingInput.className = "input-box input-ok";
+      } else {
+        typingInput.className = "input-box input-wrong";
+      }
+      updateProgressBar();
+      updateLiveWpm();
+
+      if (typingInput.value === currentSentence) {
+        // User typed correct sentence.
+        finishSentenceCorrect();
+      }
+    }
+
+    function finishSentenceCorrect() {
+      // Award points and increase level
+      score += 25;
+      let lastLevel = currentLevel;
+      currentLevel += 1;
+
+      endTime = new Date();
+      const elapsedSec = (endTime - startTime) / 1000;
+      const wordsTyped = wordCount(typingInput.value);
+      let wpm = Math.round((wordsTyped / Math.max(elapsedSec, 1e-6)) * 60);
+
+      // Prepare message
+      let resultMsg = `<span class="main-wpm">${wpm}</span> WPM<br>
+        <span style="color:#ffe272;font-size:1.01em;">+25 points!</span><br>
+        <span style="color:#19fcb2;font-size:0.98em;">Next: Level ${currentLevel}</span>`;
+      wpmResult.innerHTML = resultMsg;
+
+      timerLabel.style.color = "#65f5a3";
+      liveWpmLabel.textContent = `WPM: ${wpm}`;
+      liveWpmLabel.style.color = "#65f5a3";
+
+      updateScoreAndLevelDisplay();
+      updateProgressBar();
+
+      clearInterval(timerInterval);
+      typingInput.disabled = true;
+
+      // Delay, show next sentence
+      setTimeout(() => {
+        if (currentLevel > maxLevel) {
+          // End of all levels
+          testRunning = false;
+          wpmResult.innerHTML = `<span style="color:#51f58e;font-weight:700;text-shadow:0 1.5px 14px #2dfccb65;">🎉 Congratulations!<br>You completed all levels!<br>Final Score: <b>${score}</b></span>`;
+          timerLabel.style.color = "#51f58e";
+          liveWpmLabel.style.color = "#51f58e";
+          typingInput.className = "input-box";
+          restartBtn.style.display = "inline-block";
+          restartBtn.classList.add("glow-restart");
+          stopBtn.style.display = "none";
+          startBtn.style.display = "inline-block";
+          return;
         }
-        app = app_aliases.get(app.lower(), app.title())
-        return app
 
-    def execute_command(self, command):
-        '''
-        Executes macOS commands based on intelligent voice input.
-        '''
-        if any(kw in command for kw in ['open', 'launch', 'start']):
-            app = self.extract_app_name(command)
-            self.speak(f"Opening {app}.")
-            try:
-                subprocess.call(['open', '-a', app])
-            except Exception as e:
-                self.speak(f"Failed to open {app}.")
-        elif any(kw in command for kw in ['close browser', 'close safari']):
-            self.speak("Closing Safari.")
-            os.system("killall Safari")
-        elif any(kw in command for kw in ['close chrome', 'close google chrome']):
-            self.speak("Closing Google Chrome.")
-            os.system("killall 'Google Chrome'")
-        elif 'shutdown' in command:
-            self.speak("Are you sure you want to shut down your Mac?")
-            confirmation = self.listen("Say yes to confirm.")
-            if "yes" in confirmation:
-                self.speak("Shutting down your Mac now.")
-                os.system("osascript -e 'tell app \"System Events\" to shut down'")
-            else:
-                self.speak("Shutdown canceled.")
-        elif 'restart' in command:
-            self.speak("Are you sure you want to restart your Mac?")
-            confirmation = self.listen("Say yes to confirm.")
-            if "yes" in confirmation:
-                self.speak("Restarting your Mac now.")
-                os.system("osascript -e 'tell app \"System Events\" to restart'")
-            else:
-                self.speak("Restart canceled.")
-        elif 'sleep' in command:
-            self.speak("Putting your Mac to sleep.")
-            os.system("pmset sleepnow")
-        elif 'lock' in command or 'lock screen' in command:
-            self.speak("Locking your screen.")
-            os.system("/System/Library/CoreServices/Menu\\ Extras/User.menu/Contents/Resources/CGSession -suspend")
-        elif 'volume up' in command:
-            self.speak("Turning volume up.")
-            os.system("osascript -e 'set volume output volume ((output volume of (get volume settings)) + 10)'")
-        elif 'volume down' in command:
-            self.speak("Turning volume down.")
-            os.system("osascript -e 'set volume output volume ((output volume of (get volume settings)) - 10)'")
-        elif 'set volume to' in command:
-            match = re.search(r'set volume to (\d+)', command)
-            if match:
-                level = int(match.group(1))
-                level = max(0, min(level, 100))
-                self.speak(f"Setting volume to {level} percent.")
-                os.system(f"osascript -e 'set volume output volume {level}'")
-            else:
-                self.speak("Sorry, I couldn't catch the volume level.")
-        elif 'mute' in command:
-            self.speak("Muting volume.")
-            os.system("osascript -e 'set volume output muted true'")
-        elif 'unmute' in command or 'un-mute' in command or 'sound on' in command:
-            self.speak("Unmuting volume.")
-            os.system("osascript -e 'set volume output muted false'")
-        elif 'what time is it' in command or 'tell me the time' in command or 'current time' in command:
-            now = datetime.datetime.now().strftime("%I:%M %p")
-            self.speak(f"It's {now}")
-        elif 'what day is it' in command or 'what\'s the date' in command:
-            today = datetime.datetime.now().strftime("%A, %B %d, %Y")
-            self.speak(f"Today is {today}")
-        elif 'take screenshot' in command or 'screenshot' in command:
-            path = f"/Users/{self.user}/Desktop/screenshot_{int(time.time())}.jpg"
-            self.speak("Taking screenshot.")
-            os.system(f"screencapture -i '{path}'")
-            self.speak(f"Screenshot saved to your Desktop as {os.path.basename(path)}.")
-        elif any(greet in command for greet in ['goodbye', 'exit', 'quit', 'bye']):
-            self.speak("Goodbye! Shutting down Jarvis.")
-            exit()
-        elif any(greet in command for greet in ['hello', 'hi jarvis', 'hey', 'hi']):
-            self.speak("Hello! How can I help you today?")
-        elif 'battery' in command or 'charge' in command:
-            try:
-                output = subprocess.check_output(["pmset", "-g", "batt"]).decode()
-                percent = re.search(r"(\d+)%", output)
-                if percent:
-                    self.speak(f"Your battery is at {percent.group(1)} percent.")
-                else:
-                    self.speak("Sorry, I can't determine your battery level.")
-            except Exception:
-                self.speak("I couldn't access battery information.")
-        elif 'weather' in command:
-            self.speak("Sorry, I can't provide weather information yet.")
-        elif 'who are you' in command or 'what are you' in command:
-            self.speak("I am Jarvis, your intelligent Mac assistant.")
-        elif 'search for' in command or 'google' in command:
-            match = re.search(r'(search for|google)\s+(.*)', command)
-            if match:
-                query = match.group(2)
-                self.speak(f"Searching Google for {query}.")
-                url = f"https://www.google.com/search?q={query.replace(' ', '+')}"
-                subprocess.call(["open", url])
-            else:
-                self.speak("What would you like me to search for?")
-        elif 'remind me' in command and 'at' in command:
-            match = re.search(r'remind me to (.*) at (\d{1,2}(:\d{2})?\s*(am|pm)?)', command)
-            if match:
-                task, at_time, _, _ = match.groups()
-                self.speak(f"I will remind you to {task} at {at_time}, but reminders are basic for now.")
-                # A true scheduling daemon would require more complexity.
-            else:
-                self.speak("Sorry, I couldn't understand the reminder.")
-        else:
-            self.speak("Sorry, I can't do that yet, but I'm learning more every day.")
+        // Go to next level
+        startSentenceForLevel();
+      }, 1400);
+    }
 
-    def run(self):
-        self.speak("Jarvis is online. How can I help you?")
-        while True:
-            command = self.listen()
-            if command:
-                self.execute_command(command)
+    function startSentenceForLevel() {
+      loadSentence();
+      typingInput.value = "";
+      typingInput.disabled = false;
+      typingInput.className = "input-box input-ok";
+      typingInput.focus();
+      wpmResult.innerHTML = "&nbsp;";
+      timerLabel.textContent = `Time: 0.0s`;
+      timerLabel.style.color = "#eafefa";
+      liveWpmLabel.textContent = "WPM: 0";
+      liveWpmLabel.style.color = "#bde2fd";
+      progressBar.style.width = "0%";
+      progressBar.style.background =
+        "linear-gradient(90deg, var(--accent1) 55%, var(--accent2) 100%)";
+      startTime = new Date();
+      endTime = null;
+      clearInterval(timerInterval);
+      updateScoreAndLevelDisplay();
+      testRunning = true;
+      updateTimer(0);
+      timerInterval = setInterval(() => {
+        updateTimer();
+        updateLiveWpm();
+        updateProgressBar();
+      }, 80);
+    }
 
-if __name__ == "__main__":
-    jarvis = Jarvis()
-    jarvis.run()
+    function finishTest(early = false) {
+      endTime = new Date();
+      testRunning = false;
+      typingInput.disabled = true;
+      startBtn.disabled = false;
+      restartBtn.style.display = "inline-block";
+      restartBtn.classList.add("glow-restart");
+      stopBtn.style.display = "none";
+      startBtn.style.display = "inline-block";
+      clearInterval(timerInterval);
+
+      let resultMsg = '';
+      let wpm = 0;
+      let isCorrect = (typingInput.value === currentSentence);
+
+      // If stopped early/blank, handle gracefully (reset timer to 0)
+      if (early || typingInput.value.length === 0) {
+        resultMsg = `<span class="wrong">Test stopped early.<br>Score: <b>${score}</b></span>`;
+        timerLabel.textContent = "Time: 0.0s";
+        timerLabel.style.color = "#f67a82";
+        liveWpmLabel.textContent = "WPM: 0";
+        liveWpmLabel.style.color = "#f67a82";
+        typingInput.className = "input-box";
+        progressBar.style.width = "0%";
+        wpmResult.innerHTML = resultMsg;
+        startTime = null;
+        updateTimer(0);
+        return;
+      }
+
+      if (isCorrect) {
+        // Already handled in finishSentenceCorrect
+      } else {
+        // User made a mistake: restart from Level 1, score zero.
+        resultMsg = `<span class="wrong">Oops! Incorrect sentence.<br>Score reset to 0, Level reset!</span>`;
+        timerLabel.textContent = "Time: 0.0s";
+        timerLabel.style.color = "#f67a82";
+        liveWpmLabel.textContent = "WPM: 0";
+        liveWpmLabel.style.color = "#f67a82";
+        typingInput.className = "input-box";
+        wpmResult.innerHTML = resultMsg;
+        startTime = null;
+        updateTimer(0);
+
+        // Reset everything after a short pause
+        setTimeout(() => {
+          resetTest();
+        }, 1600);
+      }
+      updateProgressBar();
+      updateScoreAndLevelDisplay();
+    }
+
+    function updateTimer(forceZero = false) {
+      if (forceZero === 0 || (!startTime && forceZero === 0)) {
+        timerLabel.textContent = `Time: 0.0s`;
+        return;
+      }
+      if (!startTime) return;
+      const now = new Date();
+      const elapsed = ((now - startTime) / 1000).toFixed(1);
+      timerLabel.textContent = `Time: ${elapsed}s`;
+    }
+
+    function updateLiveWpm() {
+      if (!testRunning || typingInput.value.length === 0) {
+        liveWpmLabel.textContent = "WPM: 0";
+        liveWpmLabel.style.color = "#bde2fd";
+        return;
+      }
+      const now = new Date();
+      const elapsed = Math.max((now - startTime) / 1000, 1e-6);
+      const words = wordCount(typingInput.value);
+      const wpm = Math.round((words / elapsed) * 60);
+      liveWpmLabel.textContent = `WPM: ${wpm}`;
+      liveWpmLabel.style.color = "#13d9b1";
+    }
+
+    function updateProgressBar() {
+      const typedLen = typingInput.value.length;
+      const totalLen = currentSentence.length;
+      let percent = (typedLen / totalLen) * 100;
+      percent = Math.max(0, Math.min(100, percent));
+      progressBar.style.width = percent + "%";
+      // Change color for error state
+      if (testRunning && !currentSentence.startsWith(typingInput.value) && typedLen > 0) {
+        progressBar.style.background =
+          "linear-gradient(90deg, #fd6c91 82%, #ecb6e1 120%)";
+      } else {
+        progressBar.style.background =
+          "linear-gradient(90deg, var(--accent1) 55%, var(--accent2) 100%)";
+      }
+    }
+
+    typingInput.addEventListener("input", function () {
+      processInput();
+    });
+
+    typingInput.addEventListener("keydown", function(e){
+      if (!testRunning && (e.key === "Enter" || e.key === "Return")) {
+        restartBtn.click();
+      }
+      // Allow submit with Enter if correct, for mobile users
+      if (testRunning && (e.key === "Enter" || e.key === "Return") && typingInput.value === currentSentence) {
+        finishSentenceCorrect();
+      }
+    });
+
+    startBtn.addEventListener("click", function() {
+      resetTest();
+      setTimeout(() => {
+        startTest();
+      }, 120);
+      // Always remove glow from restart button when starting anew
+      restartBtn.classList.remove("glow-restart");
+    });
+
+    stopBtn.addEventListener("click", function() {
+      if (testRunning) {
+        stoppedEarly = true;
+        finishTest(true);
+      }
+    });
+
+    restartBtn.addEventListener("click", function() {
+      resetTest();
+      restartBtn.classList.remove("glow-restart");
+      setTimeout(() => {
+        startTest();
+      }, 100);
+    });
+
+    // Enter to start when ready
+    document.addEventListener("keydown", function(e){
+      if (!testRunning && (e.key === "Enter" || e.key === "Return")) {
+        if (startBtn.style.display !== 'none') startBtn.click();
+      }
+    });
+
+    // After each test start, begin sentence for level (Double start)
+    function initTestWithSentence() {
+      startTest();
+      startSentenceForLevel();
+    }
+
+    // Patch startBtn to handle level logic
+    startBtn.addEventListener("click", function(){
+      resetTest();
+      restartBtn.classList.remove("glow-restart");
+      setTimeout(() => {
+        initTestWithSentence();
+      }, 120);
+    });
+
+    window.onload = resetTest;
+  </script>
+</body>
+</html>
+
