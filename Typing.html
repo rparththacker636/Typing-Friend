@@ -1,0 +1,180 @@
+import speech_recognition as sr
+import pyttsx3
+import subprocess
+import os
+import time
+import datetime
+import re
+
+class Jarvis:
+    def __init__(self):
+        self.recognizer = sr.Recognizer()
+        self.microphone = sr.Microphone()
+        self.engine = pyttsx3.init()
+        self.engine.setProperty('rate', 175)
+        self.user = os.getlogin()
+
+    def speak(self, text):
+        print(f"Jarvis: {text}")
+        self.engine.say(text)
+        self.engine.runAndWait()
+
+    def listen(self, prompt=""):
+        if prompt:
+            self.speak(prompt)
+        with self.microphone as source:
+            self.recognizer.adjust_for_ambient_noise(source)
+            try:
+                audio = self.recognizer.listen(source, timeout=6, phrase_time_limit=8)
+            except sr.WaitTimeoutError:
+                self.speak("Listening timed out. Please try again.")
+                return ""
+        try:
+            command = self.recognizer.recognize_google(audio)
+            print(f"You: {command}")
+            return command.lower()
+        except sr.UnknownValueError:
+            self.speak("Sorry, I did not understand.")
+            return ""
+        except sr.RequestError:
+            self.speak("Network error. Could not process your command.")
+            return ""
+
+    def extract_app_name(self, command):
+        possible = re.findall(r'open (?:the )?(.*?)(?: app| application)?$', command)
+        app = possible[0] if possible else command.replace('open ', '').strip()
+        # Some normalization for common app names
+        app_aliases = {
+            'finder': 'Finder',
+            'terminal': 'Terminal',
+            'safari': 'Safari',
+            'chrome': 'Google Chrome',
+            'notes': 'Notes',
+            'mail': 'Mail',
+            'music': 'Music',
+            'messages': 'Messages',
+            'calendar': 'Calendar'
+        }
+        app = app_aliases.get(app.lower(), app.title())
+        return app
+
+    def execute_command(self, command):
+        '''
+        Executes macOS commands based on intelligent voice input.
+        '''
+        if any(kw in command for kw in ['open', 'launch', 'start']):
+            app = self.extract_app_name(command)
+            self.speak(f"Opening {app}.")
+            try:
+                subprocess.call(['open', '-a', app])
+            except Exception as e:
+                self.speak(f"Failed to open {app}.")
+        elif any(kw in command for kw in ['close browser', 'close safari']):
+            self.speak("Closing Safari.")
+            os.system("killall Safari")
+        elif any(kw in command for kw in ['close chrome', 'close google chrome']):
+            self.speak("Closing Google Chrome.")
+            os.system("killall 'Google Chrome'")
+        elif 'shutdown' in command:
+            self.speak("Are you sure you want to shut down your Mac?")
+            confirmation = self.listen("Say yes to confirm.")
+            if "yes" in confirmation:
+                self.speak("Shutting down your Mac now.")
+                os.system("osascript -e 'tell app \"System Events\" to shut down'")
+            else:
+                self.speak("Shutdown canceled.")
+        elif 'restart' in command:
+            self.speak("Are you sure you want to restart your Mac?")
+            confirmation = self.listen("Say yes to confirm.")
+            if "yes" in confirmation:
+                self.speak("Restarting your Mac now.")
+                os.system("osascript -e 'tell app \"System Events\" to restart'")
+            else:
+                self.speak("Restart canceled.")
+        elif 'sleep' in command:
+            self.speak("Putting your Mac to sleep.")
+            os.system("pmset sleepnow")
+        elif 'lock' in command or 'lock screen' in command:
+            self.speak("Locking your screen.")
+            os.system("/System/Library/CoreServices/Menu\\ Extras/User.menu/Contents/Resources/CGSession -suspend")
+        elif 'volume up' in command:
+            self.speak("Turning volume up.")
+            os.system("osascript -e 'set volume output volume ((output volume of (get volume settings)) + 10)'")
+        elif 'volume down' in command:
+            self.speak("Turning volume down.")
+            os.system("osascript -e 'set volume output volume ((output volume of (get volume settings)) - 10)'")
+        elif 'set volume to' in command:
+            match = re.search(r'set volume to (\d+)', command)
+            if match:
+                level = int(match.group(1))
+                level = max(0, min(level, 100))
+                self.speak(f"Setting volume to {level} percent.")
+                os.system(f"osascript -e 'set volume output volume {level}'")
+            else:
+                self.speak("Sorry, I couldn't catch the volume level.")
+        elif 'mute' in command:
+            self.speak("Muting volume.")
+            os.system("osascript -e 'set volume output muted true'")
+        elif 'unmute' in command or 'un-mute' in command or 'sound on' in command:
+            self.speak("Unmuting volume.")
+            os.system("osascript -e 'set volume output muted false'")
+        elif 'what time is it' in command or 'tell me the time' in command or 'current time' in command:
+            now = datetime.datetime.now().strftime("%I:%M %p")
+            self.speak(f"It's {now}")
+        elif 'what day is it' in command or 'what\'s the date' in command:
+            today = datetime.datetime.now().strftime("%A, %B %d, %Y")
+            self.speak(f"Today is {today}")
+        elif 'take screenshot' in command or 'screenshot' in command:
+            path = f"/Users/{self.user}/Desktop/screenshot_{int(time.time())}.jpg"
+            self.speak("Taking screenshot.")
+            os.system(f"screencapture -i '{path}'")
+            self.speak(f"Screenshot saved to your Desktop as {os.path.basename(path)}.")
+        elif any(greet in command for greet in ['goodbye', 'exit', 'quit', 'bye']):
+            self.speak("Goodbye! Shutting down Jarvis.")
+            exit()
+        elif any(greet in command for greet in ['hello', 'hi jarvis', 'hey', 'hi']):
+            self.speak("Hello! How can I help you today?")
+        elif 'battery' in command or 'charge' in command:
+            try:
+                output = subprocess.check_output(["pmset", "-g", "batt"]).decode()
+                percent = re.search(r"(\d+)%", output)
+                if percent:
+                    self.speak(f"Your battery is at {percent.group(1)} percent.")
+                else:
+                    self.speak("Sorry, I can't determine your battery level.")
+            except Exception:
+                self.speak("I couldn't access battery information.")
+        elif 'weather' in command:
+            self.speak("Sorry, I can't provide weather information yet.")
+        elif 'who are you' in command or 'what are you' in command:
+            self.speak("I am Jarvis, your intelligent Mac assistant.")
+        elif 'search for' in command or 'google' in command:
+            match = re.search(r'(search for|google)\s+(.*)', command)
+            if match:
+                query = match.group(2)
+                self.speak(f"Searching Google for {query}.")
+                url = f"https://www.google.com/search?q={query.replace(' ', '+')}"
+                subprocess.call(["open", url])
+            else:
+                self.speak("What would you like me to search for?")
+        elif 'remind me' in command and 'at' in command:
+            match = re.search(r'remind me to (.*) at (\d{1,2}(:\d{2})?\s*(am|pm)?)', command)
+            if match:
+                task, at_time, _, _ = match.groups()
+                self.speak(f"I will remind you to {task} at {at_time}, but reminders are basic for now.")
+                # A true scheduling daemon would require more complexity.
+            else:
+                self.speak("Sorry, I couldn't understand the reminder.")
+        else:
+            self.speak("Sorry, I can't do that yet, but I'm learning more every day.")
+
+    def run(self):
+        self.speak("Jarvis is online. How can I help you?")
+        while True:
+            command = self.listen()
+            if command:
+                self.execute_command(command)
+
+if __name__ == "__main__":
+    jarvis = Jarvis()
+    jarvis.run()
